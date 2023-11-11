@@ -1,1 +1,1 @@
-# emotion-classifier
+# simpsons-classifier
