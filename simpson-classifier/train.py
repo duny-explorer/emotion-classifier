@@ -23,14 +23,14 @@ class rightLosses(Enum):
     KLDivLoss = 2
     
 
-def fit_epoch(mod, train_data, criterion, optimizer):
+def fit_epoch(mod, train_data, criterion, optimizer, device):
     running_loss = 0.0
     running_corrects = 0
     processed_data = 0
   
     for inputs, labels in train_data:
-        inputs = inputs.to(DEVICE)
-        labels = labels.to(DEVICE)
+        inputs = inputs.to(device)
+        labels = labels.to(device)
         optimizer.zero_grad()
 
         outputs = mod(inputs)
@@ -47,15 +47,15 @@ def fit_epoch(mod, train_data, criterion, optimizer):
     return train_loss, train_acc
 
 
-def eval_epoch(mod, val_data, criterion):
+def eval_epoch(mod, val_data, criterion, device):
     mod.eval()
     running_loss = 0.0
     running_corrects = 0
     processed_size = 0
 
     for inputs, labels in val_data:
-        inputs = inputs.to(DEVICE)
-        labels = labels.to(DEVICE)
+        inputs = inputs.to(device)
+        labels = labels.to(device)
 
         with torch.set_grad_enabled(False):
             outputs = mod(inputs)
@@ -70,8 +70,8 @@ def eval_epoch(mod, val_data, criterion):
     return val_loss, val_acc
 
 
-def train(train_data, val_data, model, epochs=20, opt_name='AdamW': rightOptimizers,
-          criterion_name='CrossEntropy': rightLosses, wandb_log=True):
+def train(train_data, val_data, model, epochs=20, opt_name:rightOptimizers='AdamW',
+          criterion_name:rightLosses='CrossEntropy', wandb_log=True, device='cpu'):
     log_template = "\nEpoch {ep:03d} train_loss: {t_loss:0.4f} \
     val_loss {v_loss:0.4f} train_acc {t_acc:0.4f} val_acc {v_acc:0.4f}"
 
@@ -81,31 +81,33 @@ def train(train_data, val_data, model, epochs=20, opt_name='AdamW': rightOptimiz
         opt = torch.optim.SGD(model.parameters())
     elif opt_name == 'RMSprop':
         opt = torch.optim.RMSprop(model.parameters())
-    elif opt_name = 'Adagrad':
+    elif opt_name == 'Adagrad':
         opt = torch.optim.Adagrad(model.parameters())
 
     if criterion_name == 'CrossEntropy':
         criterion = nn.CrossEntropyLoss()
     elif criterion_name == 'NLLLoss':
         criterion = nn.NLLLoss()
-    elif criterion_name == 'KLDivLoss'
+    elif criterion_name == 'KLDivLoss':
         criterion = KLDivLoss(reduction='none', log_target=False)
 
     name_run = str(uuid.uuid4())
         
     if wandb_log:
-        config = {'balanced': True, 'epoch':epoch, 'optimizer':opt_name, 'criterion':criterion_name}
+        config = {'balanced': True, 'epoch':epochs, 'optimizer':opt_name, 'criterion':criterion_name}
         
-        run = wandb.init(project="simpsons-classifier", display_name=name_run)
+        run = wandb.init(project="simpsons-classifier", name=name_run)
 
     acc = 0
 
+    print('Start model trainning \n')
+
     with tqdm(desc="epoch", total=epochs) as pbar_outer:
         for epoch in range(epochs):
-            train_loss, train_acc = fit_epoch(model, train_data, criterion, opt)
+            train_loss, train_acc = fit_epoch(model, train_data, criterion, opt, device)
             print("loss", train_loss)
             
-            val_loss, val_acc = eval_epoch(model, val_data, criterion)
+            val_loss, val_acc = eval_epoch(model, val_data, criterion, device)
 
             if acc > val_acc:
                 torch.save(the_model.state_dict(), f'weights/{name_run}/best_model_weights_{epoch}.pth')
@@ -117,6 +119,9 @@ def train(train_data, val_data, model, epochs=20, opt_name='AdamW': rightOptimiz
             if wandb_log:
                 wandb.log({'val_loss': val_loss, 'val_acc': val_acc, 'train_loss': train_loss, 'train_acc': train_acc})
 
+    if wandb_log:
+        run.finish()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train model in Simpson's dataset")
@@ -127,8 +132,16 @@ if __name__ == "__main__":
     parser.add_argument('--epoch', type=int, default=20)
     parser.add_argument('--wandb', type=bool, default=False)
     parser.add_argument('--balanced', type=bool, default=False)
+    parser.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
     args = parser.parse_args()
 
-    model = MyCnn()
-    train_data, val_data, test_data = get_data(args.batch, args.balanced)
-    train(train_data, val_data, model, args.epoch, args.optimizer, args.criterion, args.wandb)
+    if not torch.cuda.is_available() and args.device=='cuda':
+        raise SystemError('Dont see CUDA')
+    elif torch.cuda.is_available() and args.device=='cuda':
+        args.device = 'cuda:0'
+    else:
+        args.device = 'cpu'
+
+    model = MyCnn().to(args.device)
+    train_data, val_data, test_data = get_datasets(args.batch, args.balanced)
+    train(train_data, val_data, model, args.epoch, args.optimizer, args.criterion, args.wandb, args.device)

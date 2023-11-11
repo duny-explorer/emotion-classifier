@@ -3,10 +3,13 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, datasets
 from torch.utils.data import WeightedRandomSampler
+from PIL import Image
 from pathlib import Path
 import pickle
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
+import os
 
 
 class SimpsonsDataset(Dataset):
@@ -31,8 +34,9 @@ class SimpsonsDataset(Dataset):
         if self.mode != 'test':
             self.labels = [path.parent.name for path in self.files]
             self.label_encoder.fit(self.labels)
+            SOURCE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/'
 
-            with open('data/label_encoder.pkl', 'wb') as le_dump_file:
+            with open(f'{SOURCE_DIR}/simpson-classifier/data/label_encoder.pkl', 'wb') as le_dump_file:
                   pickle.dump(self.label_encoder, le_dump_file)
                       
     def __len__(self):
@@ -66,15 +70,16 @@ class SimpsonsDataset(Dataset):
 
 
 def get_datasets(batch_size=128, balanced=True):
-    TRAIN_DIR = Path('data/train/simpsons_dataset')
-    TEST_DIR = Path('data/testset/testset')
+    print('Loading data\n')
+    SOURCE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/'
+    TRAIN_DIR = Path(f'{SOURCE_DIR}/simpson-classifier/data/train/simpsons_dataset')
+    TEST_DIR = Path(f'{SOURCE_DIR}/simpson-classifier/data/testset/testset')
 
     train_val_files = sorted(list(TRAIN_DIR.rglob('*.jpg')))
     test_files = sorted(list(TEST_DIR.rglob('*.jpg')))
 
     train_val_labels = [path.parent.name for path in train_val_files]
-    train_files, val_files = train_test_split(train_val_files, test_size=0.25, \
-                                          stratify=train_val_labels)
+    train_files, val_files = train_test_split(train_val_files, test_size=0.25, stratify=train_val_labels)
 
     val_dataset = SimpsonsDataset(val_files, mode='val')    
     train_dataset = SimpsonsDataset(train_files, mode='train')
@@ -82,8 +87,10 @@ def get_datasets(batch_size=128, balanced=True):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     if balanced:
+        counts = pd.Series([path.parent.name for path in train_files]).value_counts()
         count_weights = {k: 1/v for k, v in counts.items()}
         sample_weights = len(train_files) * [0]
+        print('Start balancing dataset\n')
 
         for i, (data, label) in enumerate(tqdm(train_dataset)):
             label_weight = count_weights[train_dataset.label_encoder.inverse_transform([label])[0]]
