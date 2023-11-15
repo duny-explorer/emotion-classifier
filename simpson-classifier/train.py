@@ -5,6 +5,7 @@ import torch.nn as nn
 from tqdm import tqdm
 import uuid
 import argparse
+import os
 
 from model import MyCnn
 from datasets import get_datasets
@@ -74,6 +75,7 @@ def train(train_data, val_data, model, epochs=20, opt_name:rightOptimizers='Adam
           criterion_name:rightLosses='CrossEntropy', wandb_log=True, device='cpu'):
     log_template = "\nEpoch {ep:03d} train_loss: {t_loss:0.4f} \
     val_loss {v_loss:0.4f} train_acc {t_acc:0.4f} val_acc {v_acc:0.4f}"
+    SOURCE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/'
 
     if opt_name == 'AdamW':
         opt = torch.optim.AdamW(model.parameters(), amsgrad=True)
@@ -92,13 +94,19 @@ def train(train_data, val_data, model, epochs=20, opt_name:rightOptimizers='Adam
         criterion = KLDivLoss(reduction='none', log_target=False)
 
     name_run = str(uuid.uuid4())
+
+    if not os.path.isdir(SOURCE_DIR + "weights"):
+     os.mkdir(SOURCE_DIR + "weights")
+
+    if not os.path.isdir(SOURCE_DIR + "weights/" + name_run):
+     os.mkdir(SOURCE_DIR + "weights/" + name_run)
         
     if wandb_log:
         config = {'balanced': True, 'epoch':epochs, 'optimizer':opt_name, 'criterion':criterion_name}
         
         run = wandb.init(project="simpsons-classifier", name=name_run)
 
-    acc = 0
+    acc = 1
 
     print('Start model trainning \n')
 
@@ -110,7 +118,7 @@ def train(train_data, val_data, model, epochs=20, opt_name:rightOptimizers='Adam
             val_loss, val_acc = eval_epoch(model, val_data, criterion, device)
 
             if acc > val_acc:
-                torch.save(the_model.state_dict(), f'weights/{name_run}/best_model_weights_{epoch}.pth')
+                torch.save(model.state_dict(), SOURCE_DIR + f'weights/{name_run}/best_model_weights_{epoch}.pth')
             
             pbar_outer.update(1)
             tqdm.write(log_template.format(ep=epoch+1, t_loss=train_loss,\
