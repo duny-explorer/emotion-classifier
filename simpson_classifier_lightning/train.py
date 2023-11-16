@@ -1,5 +1,5 @@
-from simpson_classifier.model import MyCnn
-from simpson_classifier.datasets import get_datasets
+from simpson_classifier_lightning.model import MyCnn
+from simpson_classifier_lightning.datasets import get_datasets
 import argparse
 import torch
 import uuid
