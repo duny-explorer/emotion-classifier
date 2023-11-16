@@ -1,10 +1,9 @@
-import lightning as L
+from pytorch_lightning import LightningDataModule
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, datasets
 from torch.utils.data import WeightedRandomSampler
-import lightning as L
 from PIL import Image
 from pathlib import Path
 import pickle
@@ -36,9 +35,9 @@ class SimpsonsDataset(Dataset):
         if self.mode != 'test':
             self.labels = [path.parent.name for path in self.files]
             self.label_encoder.fit(self.labels)
-            SOURCE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/'
+            SOURCE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '\\'
 
-            with open(f'{SOURCE_DIR}\\simpson_classifier_lighting\\data\\label_encoder.pkl', 'wb') as le_dump_file:
+            with open(f'{SOURCE_DIR}simpson_classifier\\data\\label_encoder.pkl', 'wb') as le_dump_file:
                   pickle.dump(self.label_encoder, le_dump_file)
                       
     def __len__(self):
@@ -71,7 +70,7 @@ class SimpsonsDataset(Dataset):
         return np.array(image)
 
 
-class SimpsonDataModule(L.LightningDataModule):
+class SimpsonDataModule(LightningDataModule):
     def __init__(self, batch_size=128, balanced=False):
         super().__init__()
         self.batch_size = batch_size
@@ -81,7 +80,7 @@ class SimpsonDataModule(L.LightningDataModule):
         SOURCE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '\\'
     
         if stage == "fit" or stage is None:
-            TRAIN_DIR = Path(f'{SOURCE_DIR}\\simpson_classifier\\data\\train\\simpsons_dataset')
+            TRAIN_DIR = Path(f'{SOURCE_DIR}simpson_classifier\\data\\train\\simpsons_dataset')
 
             train_val_files = sorted(list(TRAIN_DIR.rglob('*.jpg')))
 
@@ -106,13 +105,12 @@ class SimpsonDataModule(L.LightningDataModule):
                 train_sampler = WeightedRandomSampler(sample_weights, num_samples=counts.max() * len(count_weights), replacement=True)
                 self.train_loader = DataLoader(train_dataset, batch_size=self.batch_size, sampler=train_sampler)
                 
-            self.val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+            self.val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
 
         if stage == "test" or stage is None:
-            TEST_DIR = Path(f'{SOURCE_DIR}\\simpson_classifier\\data\\testset\\testset')
+            TEST_DIR = Path(f'{SOURCE_DIR}simpson_classifier\\data\\testset\\testset')
             test_files = sorted(list(TEST_DIR.rglob('*.jpg')))
             test_dataset = SimpsonsDataset(test_files, mode="test")
-            self.cifar_test = CIFAR10(self.data_dir, train=False, transform=self.transform)
 
     def train_dataloader(self):
         return self.train_loader

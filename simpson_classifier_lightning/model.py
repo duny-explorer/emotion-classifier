@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
-import lightning as L
+from pytorch_lightning import LightningModule
+from torchmetrics.functional import accuracy
 
 
-class MyModel(L.LightningModule):
-    def __init__(self, num_classes=42, optimizer_name='AdamW', criterion_name='CrossEntropy'):
+class MyModel(LightningModule):
+    def __init__(self, num_classes=42, optimizer_name='AdamW', criterion_name='CrossEntropy', scheduler_name=None):
         super().__init__()
 
         self.num_classes = num_classes
@@ -77,8 +78,10 @@ class MyModel(L.LightningModule):
         )
 
         self.fc4 = nn.Sequential(
-            nn.Linear(2048, n_classes),
+            nn.Linear(2048, num_classes),
         )
+
+        self.save_hyperparameters()
 
 
     def forward(self, x):
@@ -103,21 +106,23 @@ class MyModel(L.LightningModule):
         x, y = batch
         logits = self(x)
         loss = self.loss(logits, y)
-        logs={"train_loss": loss}
-        output={
-              "loss": loss,
-              "log": logs
-          }
-        return output
+        preds = torch.argmax(logits, dim=1)
+        acc = accuracy(preds, y, task='multiclass', num_classes=self.num_classes)
+        self.log('train_loss', loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log('train_acc', acc, prog_bar=True, on_step=False, on_epoch=True)
+        
+        return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         logits = self(x)
         loss = self.loss(logits, y)
         preds = torch.argmax(logits, dim=1)
-        acc = accuracy(preds, y, task="multiclass", num_classes=self.num_classes)
-        self.log("val_loss", loss, prog_bar=True)
-        self.log("val_acc", acc, prog_bar=True)
+        acc = accuracy(preds, y, task='multiclass', num_classes=self.num_classes)
+        self.log("val_loss", loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("val_acc", acc, prog_bar=True, on_step=False, on_epoch=True)
+
+        return loss
 
     def configure_optimizers(self):
         if self.optimizer_name == 'AdamW':
