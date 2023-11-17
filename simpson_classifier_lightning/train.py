@@ -52,7 +52,7 @@ if __name__ == "__main__":
     parser.add_argument('--criterion', choices=['CrossEntropy', 'NLLLoss', 'KLDivLoss'], default='CrossEntropy')
     parser.add_argument('--scheduler', choices=['LambdaLR', 'MultiplicativeLR', 'StepLR',
                                                 'MultiStepLR', 'ExponentialLR',
-                                                'CosineAnnealingLR', None], default=None)
+                                                 None], default=None)
     parser.add_argument('--epoch', type=int, default=20)
     parser.add_argument('--balanced', type=bool, default=False)
     parser.add_argument('--device', choices=['cpu', 'gpu'], default='cpu')
